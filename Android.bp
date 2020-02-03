@@ -15,12 +15,14 @@ cc_library_shared {
         "src/device.c",
         "src/local.c",
         "src/scan.c",
+        "src/sort.c",
         "src/utilities.c",
     ],
 
     cflags: [
         "-Wall",
         "-Werror",
+        "-Wno-sign-compare",
         "-Wno-unused-parameter",
     ],
 }

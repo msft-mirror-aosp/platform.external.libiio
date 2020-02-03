@@ -141,7 +141,7 @@ void iio_channel_init_finalize(struct iio_channel *chn)
 		if (strncmp(iio_chan_type_name_spec[i], chn->id, len) != 0)
 			continue;
 		/* Type must be followed by either a '_' or a digit */
-		if (chn->id[len] != '_' && chn->id[len] < '0' && chn->id[len] > '9')
+		if (chn->id[len] != '_' && (chn->id[len] < '0' || chn->id[len] > '9'))
 			continue;
 
 		chn->type = (enum iio_chan_type) i;
@@ -158,9 +158,6 @@ void iio_channel_init_finalize(struct iio_channel *chn)
 			continue;
 		len = strlen(modifier_names[i]);
 		if (strncmp(modifier_names[i], mod, len) != 0)
-			continue;
-		/* Modifier must be followed by a '_' */
-		if (mod[len] != '_')
 			continue;
 
 		chn->modifier = (enum iio_modifier) i;
@@ -190,7 +187,7 @@ static char *get_attr_xml(struct iio_channel_attr *attr, size_t *length)
 
 static char * get_scan_element(const struct iio_channel *chn, size_t *length)
 {
-	char buf[1024], repeat[8] = "", *str;
+	char buf[1024], repeat[12] = "", *str;
 	char processed = (chn->format.is_fully_defined ? 'A' - 'a' : 0);
 
 	if (chn->format.repeat > 1)

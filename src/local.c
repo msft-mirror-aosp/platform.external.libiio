@@ -18,6 +18,7 @@
 
 #include "debug.h"
 #include "iio-private.h"
+#include "sort.h"
 
 #include <dirent.h>
 #include <errno.h>
@@ -424,7 +425,7 @@ static ssize_t local_enable_buffer(const struct iio_device *dev)
 			pdata->buffer_enabled = true;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int local_set_kernel_buffers_count(const struct iio_device *dev,
@@ -1158,7 +1159,7 @@ static char * get_short_attr_name(struct iio_channel *chn, const char *attr)
 
 	if (chn->name) {
 		size_t len = strlen(chn->name);
-		if  (strncmp(chn->name, ptr, len) == 0 && ptr[len] == '_')
+		if (strncmp(chn->name, ptr, len) == 0 && ptr[len] == '_')
 			ptr += len + 1;
 	}
 
@@ -1359,7 +1360,9 @@ static int add_channel_to_device(struct iio_device *dev,
 
 	channels[dev->nb_channels++] = chn;
 	dev->channels = channels;
-	DEBUG("Added channel \'%s\' to device \'%s\'\n", chn->id, dev->id);
+	DEBUG("Added %s channel \'%s\' to device \'%s\'\n",
+		chn->is_output ? "output" : "input", chn->id, dev->id);
+
 	return 0;
 }
 
@@ -1708,6 +1711,9 @@ static int add_buffer_attributes(struct iio_device *dev, const char *devpath)
 		int ret = foreach_in_dir(dev, buf, false, add_buffer_attr);
 		if (ret < 0)
 			return ret;
+
+		qsort(dev->buffer_attrs, dev->nb_buffer_attrs, sizeof(char *),
+			iio_buffer_attr_compare);
 	}
 
 	return 0;
@@ -1748,7 +1754,7 @@ static int create_device(void *d, const char *path)
 	ret = add_buffer_attributes(dev, path);
 	if (ret < 0)
 		goto err_free_device;
-	
+
 	ret = add_scan_elements(dev, path);
 	if (ret < 0)
 		goto err_free_scan_elements;
@@ -1766,6 +1772,15 @@ static int create_device(void *d, const char *path)
 	ret = detect_and_move_global_attrs(dev);
 	if (ret < 0)
 		goto err_free_device;
+
+	/* sorting is done after global attrs are added */
+	for (i = 0; i < dev->nb_channels; i++) {
+		struct iio_channel *chn = dev->channels[i];
+		qsort(chn->attrs,  chn->nb_attrs, sizeof(struct iio_channel_attr),
+			iio_channel_attr_compare);
+	}
+	qsort(dev->attrs, dev->nb_attrs, sizeof(char *),
+		iio_device_attr_compare);
 
 	dev->words = (dev->nb_channels + 31) / 32;
 	if (dev->words) {
@@ -1989,6 +2004,9 @@ struct iio_context * local_create_context(void)
 	ret = foreach_in_dir(ctx, "/sys/bus/iio/devices", true, create_device);
 	if (ret < 0)
 		goto err_context_destroy;
+
+	qsort(ctx->devices, ctx->nb_devices, sizeof(struct iio_device *),
+		iio_device_compare);
 
 	foreach_in_dir(ctx, "/sys/kernel/debug/iio", true, add_debug);
 
