@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.7)
 project(libiio C)
 
 set(LIBIIO_VERSION_MAJOR 0)
-set(LIBIIO_VERSION_MINOR 15)
+set(LIBIIO_VERSION_MINOR 18)
 set(VERSION "${LIBIIO_VERSION_MAJOR}.${LIBIIO_VERSION_MINOR}")
 if (WIN32)
 	string(TIMESTAMP BUILD_YEAR "%Y")
@@ -15,6 +15,10 @@ endif()
 
 set(CMAKE_INSTALL_DOCDIR "" CACHE PATH "documentation root (DATAROOTDIR/doc/${PROJECT_NAME}${LIBIIO_VERSION_MAJOR}-doc)")
 include(GNUInstallDirs)
+if (${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+	set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_FULL_LIBDIR}")
+	set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+endif()
 set(CMAKE_INSTALL_DOCDIR "${CMAKE_INSTALL_DATAROOTDIR}/doc/${PROJECT_NAME}${LIBIIO_VERSION_MAJOR}-doc")
 
 set(INSTALL_PKGCONFIG_DIR "${CMAKE_INSTALL_LIBDIR}/pkgconfig"
@@ -99,7 +103,7 @@ if (ENABLE_IPV6)
 	endif()
 endif()
 
-set(LIBIIO_CFILES backend.c channel.c device.c context.c buffer.c utilities.c scan.c)
+set(LIBIIO_CFILES backend.c channel.c device.c context.c buffer.c utilities.c scan.c sort.c)
 set(LIBIIO_HEADERS iio.h)
 
 add_definitions(-D_POSIX_C_SOURCE=200809L -D__XSI_VISIBLE=500 -DLIBIIO_EXPORTS=1)
@@ -112,6 +116,7 @@ if (GIT_FOUND)
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		OUTPUT_VARIABLE LIBIIO_GIT_REPO
 		OUTPUT_STRIP_TRAILING_WHITESPACE
+		ERROR_QUIET
 	)
 
 	if ("${LIBIIO_GIT_REPO}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -157,6 +162,7 @@ endif()
 find_library(LIBUSB_LIBRARIES usb-1.0)
 find_path(LIBUSB_INCLUDE_DIR libusb-1.0/libusb.h)
 if (LIBUSB_LIBRARIES AND LIBUSB_INCLUDE_DIR)
+	message(STATUS "Looking for libusb-1.0 : Found")
 	option(WITH_USB_BACKEND "Enable the libusb backend" ON)
 
 	if(WITH_USB_BACKEND)
@@ -168,7 +174,16 @@ if (LIBUSB_LIBRARIES AND LIBUSB_INCLUDE_DIR)
 		set(NEED_THREADS 1)
 
 		include_directories(${LIBUSB_INCLUDE_DIR})
+
+		set(TEMP ${CMAKE_REQUIRED_LIBRARIES})
+		set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES}
+			 ${LIBUSB_LIBRARIES})
+		check_symbol_exists(libusb_get_version "libusb-1.0/libusb.h"
+			HAS_LIBUSB_GETVERSION)
+		set(CMAKE_REQUIRED_LIBRARIES ${TEMP})
 	endif()
+else()
+	message(STATUS "Looking for libusb-1.0 : Failed; building without usb")
 endif()
 
 find_library(LIBSERIALPORT_LIBRARIES serialport)
@@ -341,8 +356,20 @@ find_package(Doxygen)
 if(DOXYGEN_FOUND)
 	option(WITH_DOC "Generate documentation with Doxygen" ON)
 
+	# It is not an error when 'dot' is not found, just switching off the Doxygen's HAVE_DOT option
+	find_package_handle_standard_args (Dot REQUIRED_VARS DOXYGEN_DOT_EXECUTABLE)
+
+	include(cmake/CheckCaseSensitiveFileSystem.cmake)
+	if (HAVE_CASE_SENSITIVE_FILESYSTEM)
+		set(CMAKE_CASE_SENSITIVE_FILESYSTEM "YES")
+	else()
+		set(CMAKE_CASE_SENSITIVE_FILESYSTEM "NO")
+	endif()
+
 	if (WITH_DOC)
 		configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+		configure_file(${CMAKE_CURRENT_SOURCE_DIR}/CI/travis/generateDocumentationAndDeploy.sh.in
+				${CMAKE_CURRENT_BINARY_DIR}/generateDocumentationAndDeploy.sh @ONLY)
 		set(HTML_DEST_DIR ${CMAKE_CURRENT_BINARY_DIR}/html)
 		file(COPY ${CMAKE_CURRENT_SOURCE_DIR}/doc DESTINATION ${HTML_DEST_DIR})
 
