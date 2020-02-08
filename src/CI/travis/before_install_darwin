@@ -1,11 +1,5 @@
-#!/bin/sh
+#!/bin/sh -e
 
-brew update
-if ! brew ls --version cmake &>/dev/null; then
-	brew install cmake
-else
-	brew upgrade cmake
-fi
-brew install doxygen
-brew install --build-from-source libusb
-brew install libxml2
+. CI/travis/lib.sh
+
+brew_install_or_upgrade cmake doxygen libusb libxml2

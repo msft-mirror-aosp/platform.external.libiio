@@ -11,7 +11,7 @@ third_party {
     type: GIT
     value: "https://github.com/analogdevicesinc/libiio"
   }
-  version: "6ecff5d46e1b12c2859f0b63a73282940e3402bb"
-  last_upgrade_date { year: 2018 month: 5 day: 7 }
+  version: "4e22517c60f3c5e691320871956edede15459ae3"
+  last_upgrade_date { year: 2020 month: 2 day: 3 }
   license_type: RESTRICTED
 }

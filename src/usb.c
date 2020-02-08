@@ -150,7 +150,7 @@ static unsigned int usb_calculate_remote_timeout(unsigned int timeout)
 	return timeout / 2;
 }
 
-#define USB_PIPE_CTRL_TIMEOUT 200 /* These should not take long */
+#define USB_PIPE_CTRL_TIMEOUT 1000 /* These should not take long */
 
 #define IIO_USD_CMD_RESET_PIPES 0
 #define IIO_USD_CMD_OPEN_PIPE 1
@@ -740,6 +740,22 @@ static int usb_populate_context_attrs(struct iio_context *ctx,
 		}
 	}
 
+#ifdef HAS_LIBUSB_GETVERSION
+	/*
+	 * libusb_get_version was added 2012-04-17: v1.0.10,
+	 * before LIBUSB_API_VERSION was added - Jan 8, 2014
+	 * so, you can't use that to determine if it is here
+	 */
+	{
+	struct libusb_version const *ver = libusb_get_version();
+	iio_snprintf(buffer, sizeof(buffer), "%i.%i.%i.%i%s",
+			ver->major, ver->minor, ver->micro,
+			ver->nano, ver->rc);
+	ret = iio_context_add_attr(ctx, "usb,libusb", buffer);
+	if (ret < 0)
+		return ret;
+	}
+#endif
 	return 0;
 }
 
@@ -844,7 +860,8 @@ struct iio_context * usb_create_context(unsigned int bus,
 	ret = libusb_claim_interface(hdl, interface);
 	if (ret) {
 		ret = -(int) libusb_to_errno(ret);
-		ERROR("Unable to claim interface %u: %i\n", interface, ret);
+		ERROR("Unable to claim interface %u:%u:%u: %i\n",
+		      bus, address, interface, ret);
 		goto err_libusb_close;
 	}
 
