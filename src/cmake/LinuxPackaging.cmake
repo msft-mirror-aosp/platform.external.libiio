@@ -6,7 +6,20 @@ FIND_PROGRAM(RPMBUILD_CMD rpmbuild)
 if (RPMBUILD_CMD)
 	set(CPACK_PACKAGE_RELOCATABLE OFF)
 	set(CPACK_GENERATOR ${CPACK_GENERATOR};RPM)
+	set(CPACK_RPM_PACKAGE_REQUIRES "libaio >= 0.3.107, avahi >= 0.6.25, libusb1 >= 1.0.9, libxml2 >= 2.7.6")
 endif()
+
+# Add these for CentOS 7
+set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+	/lib
+	/lib/udev
+	/lib/udev/rules.d
+	/usr/sbin
+	/usr/lib/python2.7
+	/usr/lib/python2.7/site-packages
+	/usr/lib/pkgconfig
+	/usr/lib64/pkgconfig
+)
 
 set(CPACK_INCLUDE_TOPLEVEL_DIRECTORY 0)
 set(CPACK_PACKAGE_VERSION_MAJOR ${LIBIIO_VERSION_MAJOR})
@@ -46,6 +59,9 @@ if(DEB_DETECT_DEPENDENCIES AND DPKG_CMD AND DPKGQ_CMD)
 	endif()
 	if(WITH_XML_BACKEND)
 		set(PACKAGES "${PACKAGES} libxml2")
+	endif()
+	if(WITH_SERIAL_BACKEND)
+		set(PACKAGES "${PACKAGES} libserialport0")
 	endif()
 	# find the version of the installed package, which is hard to do in
 	# cmake first, turn the list into an list (seperated by semicolons)
@@ -99,10 +115,26 @@ if(DEB_DETECT_DEPENDENCIES AND DPKG_CMD AND DPKGQ_CMD)
 		${CPACK_DEBIAN_PACKAGE_DEPENDS})
 else()
 	# assume everything is turned on, and running on a modern OS
-	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libaio-dev (>= 0.3.109), libavahi-client-dev (>= 0.6.31), libavahi-common-dev (>= 0.6.31), libc6-dev (>= 2.19), libusb-1.0-0-dev (>= 2:1.0.17), libxml2-dev (>= 2.9.1)")
+	set(CPACK_DEBIAN_PACKAGE_DEPENDS "libaio (>= 0.3.109), libavahi-client (>= 0.6.31), libavahi-common (>= 0.6.31), libc6 (>= 2.19), libusb-1.0-0 (>= 2:1.0.17), libxml2 (>= 2.9.1), libserialport0 (>=0.1.1)")
 	message(STATUS "Using default dependencies for packaging")
 endif()
 
-message(STATUS "Package dependencies: " ${CPACK_DEBIAN_PACKAGE_DEPENDS})
+message(STATUS "Package dependencies (.deb): " ${CPACK_DEBIAN_PACKAGE_DEPENDS})
+if (CPACK_RPM_PACKAGE_REQUIRES)
+	message(STATUS "Package dependencies (.rpm): " ${CPACK_RPM_PACKAGE_REQUIRES})
+endif()
 
+if(${CMAKE_MAJOR_VERSION} LESS 3)
+	# old versions of cmake dont include this, but the same vintage of dpkg requires it
+	IF(NOT CPACK_DEBIAN_PACKAGE_ARCHITECTURE)
+		FIND_PROGRAM(DPKG_CMD dpkg)
+		IF(NOT DPKG_CMD)
+			MESSAGE(STATUS "Can not find dpkg in your path, default to i386.")
+			SET(CPACK_DEBIAN_PACKAGE_ARCHITECTURE i386)
+		ENDIF(NOT DPKG_CMD)
+		EXECUTE_PROCESS(COMMAND "${DPKG_CMD}" --print-architecture
+			OUTPUT_VARIABLE CPACK_DEBIAN_PACKAGE_ARCHITECTURE
+			OUTPUT_STRIP_TRAILING_WHITESPACE)
+	ENDIF(NOT CPACK_DEBIAN_PACKAGE_ARCHITECTURE)
+endif()
 include(CPack)

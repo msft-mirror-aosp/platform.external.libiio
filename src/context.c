@@ -19,6 +19,7 @@
 #include "debug.h"
 #include "iio-config.h"
 #include "iio-private.h"
+#include "sort.h"
 
 #include <errno.h>
 #include <string.h>
